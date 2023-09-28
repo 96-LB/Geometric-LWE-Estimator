@@ -1,3 +1,4 @@
+import sys
 from functools import wraps
 from multiprocessing import Pool
 
@@ -33,6 +34,10 @@ def build_H(D_e1, D_v, t, n):
 
 ### EXPERIMENTS
 
+def log(*, id, n, t, og, th, det, s_s, s_e, s_eps, s_h_s, s_h_e):
+    print(f'{id},{n},{t},{og},{th},{det},{s_s},{s_e},{s_eps},{s_h_s},{s_h_e}')
+
+
 T = TypeVar('T')
 def experiment(f: Callable[..., T]) -> Callable[[dict], tuple[int, T]]:
     @wraps(f)
@@ -58,45 +63,22 @@ def experiment_fast(n, rtSigma, sigma_s, sigma_e, sigma_eps, D_e1, D_v, t):
     return det(G) / sigma_s^(2 * n) / sigma_e^(2 * n)
 
 
-def run_experiments(experiments, threads, *, n, sigma_s, sigma_e, sigma_eps, sigma_h_e, t, slow=False):
+def run_experiments(experiments, threads, *, n, sigma_s, sigma_e, sigma_eps, sigma_h_e, t):
     sigma_h_s = sqrt(2/3)
     D_e1 = build_Gaussian_law(sigma_h_e, 20)
     D_v = {-1: 1/3, 0: 1/3, 1: 1/3} # build_Gaussian_law(sigma_h_s, 20)
+    rtSigma = diagonal_matrix((sigma_s,) * n + (sigma_e,) * n)
     
     original_det = -2 * n * ln(sigma_s * sigma_e)
     theoretical_det = det_full(sigma_s, sigma_e, sigma_eps, sigma_h_s, sigma_h_e, n, t)
-    
-    print(f'Original: {original_det}')
-    print(f'Theoretical: {theoretical_det}')
-    print()
-    
+        
     # run many experiments with threading
     with Pool(threads) as p:
-        
-        slow_results = {}
-        if slow:
-            print()
-            print('Slow!')
-            args = [{
-                'id': i,
-                'n': n,
-                'Sigma': diagonal_matrix((sigma_s**2,) * n + (sigma_e**2,) * n),
-                'Sigma_eps': (sigma_eps**2) * identity_matrix(t * n),
-                'D_e1': D_e1,
-                'D_v': D_v,
-                't': t
-            } for i in range(experiments)]
-            for id, result in p.imap_unordered(experiment_slow, args):
-                print(ln(result))
-                slow_results[id] = result
-        
-        print()
-        print('Fast!')
-        fast_results = {}
+        results = {}
         args = [{
             'id': i,
             'n': n,
-            'rtSigma': diagonal_matrix((sigma_s,) * n + (sigma_e,) * n),
+            'rtSigma': rtSigma,
             'sigma_s': sigma_s,
             'sigma_e': sigma_e,
             'sigma_eps': sigma_eps,
@@ -105,12 +87,54 @@ def run_experiments(experiments, threads, *, n, sigma_s, sigma_e, sigma_eps, sig
             't': t
         } for i in range(experiments)]
         for id, result in p.imap_unordered(experiment_fast, args):
-            print(ln(result))
-            fast_results[id] = result
+            results[id] = result
+            log(
+                id=id,
+                n=n,
+                t=t,
+                og=original_det,
+                th=theoretical_det,
+                det=ln(result),
+                s_s=sigma_s,
+                s_e=sigma_e,
+                s_eps=sigma_eps,
+                s_h_s=sigma_h_s,
+                s_h_e=sigma_h_e
+            )
     
-    print()
-    print(f'Original: {original_det}')
-    print(f'Theoretical: {theoretical_det}')
-    if slow: print(f'Slow: {ln(sum(slow_results.values())/experiments)}')
-    print(f'Fast: {ln(sum(fast_results.values())/experiments)}')
-    if slow: print(f'Difference: {ln(sum(abs(slow_results[id] - fast_results[id]) for id in slow_results)/experiments)}')
+    avg = ln(sum(results.values())/experiments)
+    log(
+        id=f'AVG-{experiments}',
+        n=n,
+        t=t,
+        og=original_det,
+        th=theoretical_det,
+        det=avg,
+        s_s=sigma_s,
+        s_e=sigma_e,
+        s_eps=sigma_eps,
+        s_h_s=sigma_h_s,
+        s_h_e=sigma_h_e
+    )
+
+
+
+if __name__ == '__main__':
+    experiments = int(sys.argv[1])
+    threads = int(sys.argv[2])
+    n = int(sys.argv[3])
+    t = int(sys.argv[4])
+    log(
+        id='id',
+        n='n',
+        t='t',
+        og='Original determinant',
+        th='Theoretical determinant',
+        det='Calculated determinant',
+        s_s='σ_s',
+        s_e='σ_e',
+        s_eps='σ_eps',
+        s_h_s='σ_h_s',
+        s_h_e='σ_h_e'
+    )
+    run_experiments(experiments, threads, n=n, sigma_e=3.2, sigma_eps=3.2, sigma_s=3.2, sigma_h_e=3.2, t=t)
