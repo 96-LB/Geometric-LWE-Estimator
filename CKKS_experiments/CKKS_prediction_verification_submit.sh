@@ -1,30 +1,21 @@
 #!/bin/bash -l
 
-# Give the job a name
+# Queue the job (time format = hh:mm:ss)
 #SBATCH --job-name="geo_LWE_prediction_verification"
+#SBATCH --qos=default
+#SBATCH --time=18:00:00
+#SBATCH --mail-type=ALL
 
-# Set the number of nodes (Physical Computers)
+# Set the specifications
 #SBATCH --nodes=1
-
-# Set the number of cores needed
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=10
-
-# Set the amount of memory required
 #SBATCH --mem-per-cpu=2gb
+#SBATCH --array=0-35
 
 # Set stdout/stderr
-#SBATCH --output="geo_LWE_prediction_verification.out.%j"
-#SBATCH --error="geo_LWE_prediction_verification.err.%j"
-
-# Set expected wall time for the job (format = hh:mm:ss)
-#SBATCH --time=18:00:00
-
-# Set quality of service level (useful for obtaining GPU resources)
-#SBATCH --qos=dpart
-
-# Turn on mail notifications for job failure and completion
-#SBATCH --mail-type=END,FAIL
+#SBATCH --output="output/prediction_verification/%j.out"
+#SBATCH --error="output/prediction_verification/%j.err"
 
 ## No more SBATCH commands after this point ##
 
@@ -33,11 +24,11 @@
 . /usr/share/Modules/init/bash
 . /etc/profile.d/ummodules.sh
 
-module add Python3/3.7.6
+module add Python3/3.10.6
 module add sage
 
 # Define and create unique scratch directory for this job
-SCRATCH_DIRECTORY=/scratch0/${USER}/${SLURM_JOBID}
+SCRATCH_DIRECTORY=/scratch0/${USER}/${SLURM_ARRAY_JOB_ID}/${SLURM_ARRAY_TASK_ID}/
 mkdir -p ${SCRATCH_DIRECTORY}
 cd ${SCRATCH_DIRECTORY}
 
@@ -45,17 +36,10 @@ cd ${SCRATCH_DIRECTORY}
 cp -r ${SLURM_SUBMIT_DIR}/geometricLWE ${SCRATCH_DIRECTORY}
 
 # Run code
-
-OUTFILE=SCA_estimate-${SLURM_JOBID}.log
-
 cd geometricLWE/CKKS_experiments
-sage CKKS_prediction_verification.sage 10 10 > ${OUTFILE}
-
-# Copy outputs back to home directory
-cp ${OUTFILE} ${SLURM_SUBMIT_DIR}
+sage CKKS_prediction_verification.sage 200 10 ${SLURM_ARRAY_TASK_ID}
 
 # Remove code files
-cd ${SLURM_SUBMIT_DIR}
 rm -rf ${SCRATCH_DIRECTORY}
 
 # Finish the script

@@ -122,19 +122,11 @@ def run_experiments(experiments, threads, *, n, sigma_s, sigma_e, sigma_eps, sig
 if __name__ == '__main__':
     experiments = int(sys.argv[1])
     threads = int(sys.argv[2])
-    n = int(sys.argv[3])
-    t = int(sys.argv[4])
-    log(
-        id='id',
-        n='n',
-        t='t',
-        og='Original determinant',
-        th='Theoretical determinant',
-        det='Calculated determinant',
-        s_s='σ_s',
-        s_e='σ_e',
-        s_eps='σ_eps',
-        s_h_s='σ_h_s',
-        s_h_e='σ_h_e'
-    )
+    if len(sys.argv) == 4:
+        nt = int(sys.argv[3])
+        n = 2**(nt // 12)
+        t = 2**(nt % 12)
+    else:
+        n = int(sys.argv[3])
+        t = int(sys.argv[4])
     run_experiments(experiments, threads, n=n, sigma_e=3.2, sigma_eps=3.2, sigma_s=3.2, sigma_h_e=3.2, t=t)
